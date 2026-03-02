@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Football AI Predictor</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0d1117; color: #e6edf3; min-height: 100vh; }
+
+    header {
+      background: linear-gradient(135deg, #1a2332 0%, #0d1117 100%);
+      border-bottom: 1px solid #21262d;
+      padding: 20px 32px;
+      display: flex; align-items: center; gap: 16px;
+    }
+    header .logo { font-size: 2rem; }
+    header h1 { font-size: 1.5rem; font-weight: 700; color: #58a6ff; }
+    header p { font-size: 0.85rem; color: #8b949e; margin-top: 2px; }
+
+    main { max-width: 1100px; margin: 0 auto; padding: 28px 16px; }
+
+    .panel {
+      background: #161b22; border: 1px solid #21262d;
+      border-radius: 12px; padding: 22px; margin-bottom: 24px;
+    }
+    .panel h2 { font-size: 0.85rem; font-weight: 600; color: #8b949e; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 16px; }
+
+    .leagues-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(165px, 1fr)); gap: 10px; }
+    .league-card {
+      border: 2px solid #21262d; border-radius: 10px; padding: 11px 14px;
+      cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 10px; user-select: none;
+    }
+    .league-card:hover { border-color: #388bfd; background: #1c2333; }
+    .league-card.selected { border-color: #58a6ff; background: #1c2f5e; }
+    .league-card .flag { font-size: 1.4rem; }
+    .league-card .info .name { font-weight: 600; font-size: 0.88rem; }
+    .league-card .info .country { font-size: 0.75rem; color: #8b949e; margin-top: 2px; }
+
+    .controls-row { display: flex; align-items: flex-end; gap: 28px; flex-wrap: wrap; margin-top: 18px; }
+    .control-group label { display: block; font-size: 0.82rem; color: #8b949e; margin-bottom: 7px; }
+    .control-group input[type="range"] { padding: 0; width: 130px; accent-color: #58a6ff; cursor: pointer; }
+    .range-value {
+      display: inline-block; background: #21262d; border-radius: 6px;
+      padding: 3px 9px; font-size: 0.82rem; font-weight: 600; color: #58a6ff; margin-left: 8px;
+    }
+
+    .btn-row { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 20px; }
+    .btn {
+      border: none; border-radius: 10px; padding: 11px 24px;
+      font-size: 0.95rem; font-weight: 600; cursor: pointer;
+      transition: opacity 0.2s, transform 0.1s; display: flex; align-items: center; gap: 8px;
+    }
+    .btn:hover { opacity: 0.88; }
+    .btn:active { transform: scale(0.97); }
+    .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    .btn-primary { background: linear-gradient(135deg, #1f6feb, #388bfd); color: #fff; }
+    .btn-combo { background: linear-gradient(135deg, #6e40c9, #8957e5); color: #fff; }
+
+    .loader { display: none; text-align: center; padding: 40px; color: #8b949e; }
+    .loader.active { display: block; }
+    .spinner { width: 38px; height: 38px; border: 3px solid #21262d; border-top-color: #58a6ff; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 14px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .error-box { display: none; background: #1f1114; border: 1px solid #f85149; border-radius: 10px; padding: 14px 18px; color: #f85149; margin-bottom: 18px; }
+    .error-box.active { display: block; }
+
+    /* COMBO TICKET */
+    .combo-section { display: none; margin-bottom: 28px; }
+    .combo-section.active { display: block; }
+    .combo-ticket {
+      background: linear-gradient(135deg, #1a1040, #16103a);
+      border: 1px solid #6e40c9; border-radius: 14px; overflow: hidden;
+    }
+    .combo-header {
+      background: linear-gradient(135deg, #6e40c9, #8957e5);
+      padding: 14px 20px; display: flex; align-items: center; justify-content: space-between;
+    }
+    .combo-header h3 { font-size: 1rem; font-weight: 700; color: #fff; }
+    .combo-header span { font-size: 0.8rem; color: rgba(255,255,255,0.75); }
+    .combo-picks { padding: 0; }
+    .combo-pick {
+      display: grid; grid-template-columns: 1fr auto auto;
+      gap: 12px; align-items: center;
+      padding: 13px 20px; border-bottom: 1px solid rgba(110,64,201,0.2);
+    }
+    .combo-pick:last-child { border-bottom: none; }
+    .combo-pick .match-info .match-name { font-weight: 600; font-size: 0.9rem; }
+    .combo-pick .match-info .match-meta { font-size: 0.75rem; color: #8b949e; margin-top: 2px; }
+    .combo-pick .pick-label {
+      background: rgba(110,64,201,0.25); border: 1px solid rgba(137,87,229,0.4);
+      border-radius: 8px; padding: 5px 11px; font-size: 0.82rem; font-weight: 600;
+      color: #c9b1ff; white-space: nowrap;
+    }
+    .combo-pick .pick-odds { font-size: 1.1rem; font-weight: 700; color: #f0c040; white-space: nowrap; }
+    .combo-footer {
+      background: rgba(0,0,0,0.3); padding: 16px 20px;
+      display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;
+    }
+    .combo-total { display: flex; align-items: center; gap: 16px; }
+    .combo-total-odds { font-size: 1.5rem; font-weight: 800; color: #f0c040; }
+    .combo-total-label { font-size: 0.8rem; color: #8b949e; }
+    .combo-gain {
+      background: rgba(63,185,80,0.15); border: 1px solid rgba(63,185,80,0.3);
+      border-radius: 10px; padding: 10px 18px; text-align: center;
+    }
+    .combo-gain .gain-val { font-size: 1.3rem; font-weight: 800; color: #3fb950; }
+    .combo-gain .gain-label { font-size: 0.75rem; color: #8b949e; margin-top: 2px; }
+
+    /* RESULTS */
+    .results-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
+    .results-header h2 { font-size: 1.1rem; font-weight: 600; }
+    .results-count { background: #21262d; border-radius: 20px; padding: 4px 12px; font-size: 0.8rem; color: #8b949e; }
+
+    .cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 16px; }
+
+    .card { background: #161b22; border: 1px solid #21262d; border-radius: 14px; overflow: hidden; transition: transform 0.2s, border-color 0.2s; }
+    .card:hover { transform: translateY(-3px); border-color: #30363d; }
+
+    .card-header { background: linear-gradient(135deg, #1c2333, #1a2332); padding: 15px 17px; border-bottom: 1px solid #21262d; }
+    .card-league { font-size: 0.72rem; color: #58a6ff; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 7px; }
+    .card-teams { font-size: 1rem; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+    .card-teams .vs { font-size: 0.72rem; color: #8b949e; font-weight: 400; }
+    .card-date { font-size: 0.75rem; color: #8b949e; margin-top: 5px; }
+
+    .card-body { padding: 15px 17px; }
+    .predictions-row { display: flex; gap: 8px; margin-bottom: 12px; }
+
+    .pred-badge { flex: 1; background: #1c2333; border: 1px solid #30363d; border-radius: 10px; padding: 10px 8px; text-align: center; }
+    .pred-badge .label { font-size: 0.65rem; color: #8b949e; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 5px; }
+    .pred-badge .value { font-size: 0.95rem; font-weight: 700; margin-bottom: 3px; }
+    .pred-badge .odds-val { font-size: 0.78rem; color: #f0c040; font-weight: 600; margin-bottom: 3px; }
+    .pred-badge .conf { font-size: 0.65rem; border-radius: 20px; padding: 2px 7px; display: inline-block; }
+
+    .conf-high { background: #1a3a1e; color: #3fb950; }
+    .conf-medium { background: #3a2f0a; color: #d29922; }
+    .conf-low { background: #3a1a1e; color: #f85149; }
+
+    .best-pick-row {
+      background: rgba(110,64,201,0.1); border: 1px solid rgba(110,64,201,0.3);
+      border-radius: 8px; padding: 8px 12px; margin-bottom: 10px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .best-pick-row .bp-label { font-size: 0.72rem; color: #8b949e; }
+    .best-pick-row .bp-val { font-weight: 700; color: #c9b1ff; font-size: 0.9rem; }
+    .best-pick-row .bp-odds { font-size: 1rem; font-weight: 800; color: #f0c040; }
+
+    .reasoning { font-size: 0.76rem; color: #8b949e; line-height: 1.5; margin-top: 4px; }
+    .summary-box { background: #0d1117; border-radius: 8px; padding: 11px 13px; font-size: 0.8rem; color: #c9d1d9; line-height: 1.6; margin-top: 10px; border-left: 3px solid #58a6ff; }
+
+    .empty-state { text-align: center; padding: 50px 20px; color: #8b949e; }
+    .empty-state .icon { font-size: 3rem; margin-bottom: 12px; }
+
+    /* HISTORY */
+    .history-section { margin-bottom: 28px; }
+    .history-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+    .history-header h2 { font-size: 1.1rem; font-weight: 600; }
+    .history-count { background: #21262d; border-radius: 20px; padding: 4px 12px; font-size: 0.8rem; color: #8b949e; }
+    .history-list { background: #161b22; border: 1px solid #21262d; border-radius: 12px; overflow: hidden; }
+    .history-entry {
+      display: grid; grid-template-columns: 1fr auto auto auto;
+      gap: 14px; align-items: center;
+      padding: 13px 18px; border-bottom: 1px solid #21262d; transition: background 0.15s;
+    }
+    .history-entry:last-child { border-bottom: none; }
+    .history-entry:hover { background: #1c2333; }
+    .entry-date { font-size: 0.8rem; color: #8b949e; }
+    .entry-meta { font-size: 0.9rem; font-weight: 700; margin-top: 3px; }
+    .entry-leagues { font-size: 0.75rem; color: #58a6ff; margin-top: 2px; }
+    .btn-sm { border: none; border-radius: 8px; padding: 6px 14px; font-size: 0.82rem; font-weight: 600; cursor: pointer; transition: opacity 0.2s; white-space: nowrap; }
+    .btn-sm:hover { opacity: 0.8; }
+    .btn-view { background: rgba(88,166,255,0.15); color: #58a6ff; border: 1px solid rgba(88,166,255,0.3); }
+    .btn-delete { background: rgba(248,81,73,0.1); color: #f85149; border: 1px solid rgba(248,81,73,0.25); }
+    .history-empty { padding: 28px; text-align: center; color: #8b949e; font-size: 0.88rem; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">⚽</div>
+  <div>
+    <h1>Football AI Predictor</h1>
+    <p>Prédictions IA + Combiné recommandé pour les 5 grands championnats européens</p>
+  </div>
+</header>
+
+<main>
+
+  <!-- CONFIGURATION -->
+  <div class="panel">
+    <h2>Configuration</h2>
+    <div class="leagues-grid" id="leaguesGrid"></div>
+
+    <div class="controls-row">
+      <div class="control-group">
+        <label>Matchs analysés par championnat</label>
+        <div style="display:flex;align-items:center;">
+          <input type="range" id="nextRange" min="1" max="10" value="3" oninput="document.getElementById('nextVal').textContent=this.value" />
+          <span class="range-value" id="nextVal">3</span>
+        </div>
+      </div>
+      <div class="control-group">
+        <label>Cote minimale du combiné</label>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <input type="number" id="minOddsInput" min="2" max="10000" value="100"
+            style="width:90px;background:#21262d;border:1px solid #30363d;border-radius:6px;padding:5px 10px;color:#58a6ff;font-weight:700;font-size:0.9rem;outline:none;" />
+          <span style="font-size:0.8rem;color:#8b949e;">max 10 matchs</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-primary" id="btnPredict" onclick="loadPredictions()">🔮 Voir les prédictions</button>
+      <button class="btn btn-combo" id="btnCombo" onclick="loadCombo()">🎯 Générer le combiné</button>
+      <button class="btn" style="background:#21262d;color:#8b949e;border:1px solid #30363d;" onclick="toggleHistory()">📋 Historique</button>
+    </div>
+  </div>
+
+  <div class="loader" id="loader"><div class="spinner"></div><p id="loaderMsg">Chargement...</p></div>
+  <div class="error-box" id="errorBox"></div>
+
+  <!-- COMBO TICKET -->
+  <div class="combo-section" id="comboSection">
+    <div class="results-header">
+      <h2>Combiné Recommandé</h2>
+    </div>
+    <div class="combo-ticket">
+      <div class="combo-header">
+        <h3>🎯 COMBINÉ IA</h3>
+        <span id="comboSubtitle"></span>
+      </div>
+      <div class="combo-picks" id="comboPicks"></div>
+      <div class="combo-footer">
+        <div class="combo-total">
+          <div>
+            <div class="combo-total-label">Cote totale</div>
+            <div class="combo-total-odds" id="comboTotalOdds">—</div>
+          </div>
+        </div>
+        <div class="combo-gain">
+          <div class="gain-val" id="comboGain">—</div>
+          <div class="gain-label">Retour pour 100€ misés</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- HISTORY -->
+  <div class="history-section" id="historySection" style="display:none;">
+    <div class="history-header">
+      <h2>Historique des combinés</h2>
+      <span class="history-count" id="historyCount">0 entrée</span>
+    </div>
+    <div class="history-list" id="historyList">
+      <div class="history-empty">Aucun combiné enregistré.</div>
+    </div>
+  </div>
+
+  <!-- PREDICTIONS -->
+  <div id="resultsSection" style="display:none;">
+    <div class="results-header">
+      <h2>Prédictions par match</h2>
+      <span class="results-count" id="resultsCount"></span>
+    </div>
+    <div class="cards-grid" id="cardsGrid"></div>
+  </div>
+
+  <div class="empty-state" id="emptyState">
+    <div class="icon">🏟️</div>
+    <p>Sélectionne des championnats et lance les prédictions ou le combiné</p>
+  </div>
+
+</main>
+
+<script>
+  const LEAGUES = [
+    { id: "PL",  name: "Premier League", country: "Angleterre", flag: "🏴󠁧󠁢󠁥󠁮󠁧󠁿" },
+    { id: "PD",  name: "La Liga",         country: "Espagne",    flag: "🇪🇸" },
+    { id: "BL1", name: "Bundesliga",      country: "Allemagne",  flag: "🇩🇪" },
+    { id: "SA",  name: "Serie A",         country: "Italie",     flag: "🇮🇹" },
+    { id: "FL1", name: "Ligue 1",         country: "France",     flag: "🇫🇷" },
+  ];
+  const selected = new Set(["PL", "PD", "BL1", "SA", "FL1"]);
+
+  const grid = document.getElementById("leaguesGrid");
+  LEAGUES.forEach(l => {
+    const card = document.createElement("div");
+    card.className = "league-card selected";
+    card.dataset.id = l.id;
+    card.innerHTML = `<span class="flag">${l.flag}</span><div class="info"><div class="name">${l.name}</div><div class="country">${l.country}</div></div>`;
+    card.onclick = () => {
+      if (selected.has(l.id)) { selected.delete(l.id); card.classList.remove("selected"); }
+      else { selected.add(l.id); card.classList.add("selected"); }
+    };
+    grid.appendChild(card);
+  });
+
+  function fmt(dateStr) {
+    const d = new Date(dateStr);
+    return d.toLocaleDateString("fr-FR", { weekday: "short", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+  }
+  function confClass(c) { return c === "high" ? "conf-high" : c === "medium" ? "conf-medium" : "conf-low"; }
+  function confLabel(c) { return c === "high" ? "Haute" : c === "medium" ? "Moyenne" : "Faible"; }
+  function outcomeLabel(o) { return o === "1" ? "🏠 Domicile" : o === "X" ? "🤝 Nul" : "✈️ Extérieur"; }
+
+  function setLoading(active, msg = "Analyse en cours...") {
+    document.getElementById("loader").classList.toggle("active", active);
+    document.getElementById("loaderMsg").textContent = msg;
+    document.getElementById("btnPredict").disabled = active;
+    document.getElementById("btnCombo").disabled = active;
+  }
+
+  function showError(msg) {
+    const el = document.getElementById("errorBox");
+    el.textContent = "Erreur : " + msg;
+    el.classList.add("active");
+  }
+
+  function clearError() { document.getElementById("errorBox").classList.remove("active"); }
+
+  function buildCard(pred) {
+    const fix = pred.fixture;
+    const r = pred.result_1x2;
+    const g = pred.goals;
+    const b = pred.btts;
+
+    return `<div class="card">
+      <div class="card-header">
+        <div class="card-league">${fix.league.name} · ${fix.league.country}</div>
+        <div class="card-teams">${fix.home_team.name}<span class="vs">VS</span>${fix.away_team.name}</div>
+        <div class="card-date">📅 ${fmt(fix.date)}${fix.venue ? ' · 📍 '+fix.venue : ''}</div>
+      </div>
+      <div class="card-body">
+        <div class="predictions-row">
+          <div class="pred-badge">
+            <div class="label">Résultat</div>
+            <div class="value">${outcomeLabel(r.outcome)}</div>
+            <div class="odds-val">@ ${r.estimated_odds.toFixed(2)}</div>
+            <span class="conf ${confClass(r.confidence)}">${confLabel(r.confidence)}</span>
+          </div>
+          <div class="pred-badge">
+            <div class="label">Buts</div>
+            <div class="value">${g.prediction.startsWith("Over") ? "🔥 " : "🛡️ "}${g.prediction}</div>
+            <div class="odds-val">@ ${g.estimated_odds.toFixed(2)}</div>
+            <span class="conf ${confClass(g.confidence)}">${confLabel(g.confidence)}</span>
+          </div>
+          <div class="pred-badge">
+            <div class="label">BTTS</div>
+            <div class="value">${b.prediction === "Yes" ? "⚽⚽ Yes" : "🚫 No"}</div>
+            <div class="odds-val">@ ${b.estimated_odds.toFixed(2)}</div>
+            <span class="conf ${confClass(b.confidence)}">${confLabel(b.confidence)}</span>
+          </div>
+        </div>
+        <div class="best-pick-row">
+          <div><div class="bp-label">Meilleur pari</div><div class="bp-val">⭐ ${pred.best_pick}</div></div>
+          <div class="bp-odds">@ ${pred.best_pick_odds.toFixed(2)}</div>
+        </div>
+        <div class="reasoning">
+          <strong style="color:#c9d1d9;">Résultat :</strong> ${r.reasoning}<br>
+          <strong style="color:#c9d1d9;">Buts :</strong> ${g.reasoning}
+        </div>
+        <div class="summary-box">${pred.summary}</div>
+      </div>
+    </div>`;
+  }
+
+  function estimatedTime(totalFixtures, isCombo) {
+    // 5 appels API × 7s + Groq (~37s/fixture) pour predictions et combo
+    const secsPerFixture = 37;
+    const secs = totalFixtures * secsPerFixture;
+    if (secs < 60) return `~${secs}s`;
+    const m = Math.ceil(secs / 60);
+    return `~${m} min`;
+  }
+
+  async function loadPredictions() {
+    if (selected.size === 0) { alert("Sélectionne au moins un championnat."); return; }
+    const leagues = [...selected].join(",");
+    const next = parseInt(document.getElementById("nextRange").value);
+    const totalFixtures = selected.size * next;
+    const eta = estimatedTime(totalFixtures, false);
+
+    clearError();
+    setLoading(true, `Analyse de ${totalFixtures} match${totalFixtures > 1 ? 's' : ''} par l'IA… (${eta})`);
+    document.getElementById("resultsSection").style.display = "none";
+    document.getElementById("emptyState").style.display = "none";
+
+    try {
+      const res = await fetch(`/predictions?leagues=${encodeURIComponent(leagues)}&next=${next}`);
+      if (!res.ok) { const e = await res.json(); throw new Error(e.detail || "Erreur serveur"); }
+      const data = await res.json();
+
+      document.getElementById("cardsGrid").innerHTML = data.map(buildCard).join("");
+      document.getElementById("resultsCount").textContent = `${data.length} match${data.length !== 1 ? 's' : ''}`;
+      document.getElementById("resultsSection").style.display = "block";
+      if (data.length === 0) document.getElementById("emptyState").style.display = "block";
+    } catch (err) {
+      showError(err.message);
+      document.getElementById("emptyState").style.display = "block";
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const CONF_BADGE = {
+    high:   '<span style="background:#1a3a1e;color:#3fb950;border-radius:20px;padding:2px 7px;font-size:0.7rem;font-weight:600;">Haute</span>',
+    medium: '<span style="background:#3a2f0a;color:#d29922;border-radius:20px;padding:2px 7px;font-size:0.7rem;font-weight:600;">Moyenne</span>',
+    low:    '<span style="background:#3a1a1e;color:#f85149;border-radius:20px;padding:2px 7px;font-size:0.7rem;font-weight:600;">Faible</span>',
+  };
+
+  function displayCombo(data, subtitle = null) {
+    const targetBadge = data.target_reached
+      ? '<span style="background:#1a3a1e;color:#3fb950;border-radius:20px;padding:3px 10px;font-size:0.78rem;font-weight:700;">✓ Cible atteinte</span>'
+      : '<span style="background:#3a2f0a;color:#d29922;border-radius:20px;padding:3px 10px;font-size:0.78rem;font-weight:700;">⚠ Cible non atteinte</span>';
+
+    const defaultSubtitle = `${data.picks.length} sélection${data.picks.length > 1 ? 's' : ''} &nbsp;${targetBadge}`;
+    document.getElementById("comboSubtitle").innerHTML = subtitle || defaultSubtitle;
+    document.getElementById("comboTotalOdds").textContent = data.total_odds.toFixed(2);
+    document.getElementById("comboGain").textContent = data.return_per_100.toFixed(2) + " €";
+
+    document.getElementById("comboPicks").innerHTML = data.picks.map(p => `
+      <div class="combo-pick">
+        <div class="match-info">
+          <div class="match-name">${p.match}</div>
+          <div class="match-meta">${p.league} · ${p.date} &nbsp;${CONF_BADGE[p.confidence] || ''}</div>
+        </div>
+        <div class="pick-label">${p.pick}</div>
+        <div class="pick-odds">@ ${p.odds.toFixed(2)}</div>
+      </div>`).join("");
+
+    document.getElementById("comboSection").classList.add("active");
+    document.getElementById("comboSection").scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  async function loadCombo() {
+    if (selected.size === 0) { alert("Sélectionne au moins un championnat."); return; }
+    const leagues = [...selected].join(",");
+    const next = document.getElementById("nextRange").value;
+    const minOdds = parseFloat(document.getElementById("minOddsInput").value) || 100;
+
+    const totalFixtures = Math.min(selected.size * parseInt(next), 10);
+    const eta = estimatedTime(totalFixtures, true);
+
+    clearError();
+    setLoading(true, `Génération du combiné (${totalFixtures} match${totalFixtures > 1 ? 's' : ''} analysés)… (${eta})`);
+    document.getElementById("comboSection").classList.remove("active");
+    document.getElementById("emptyState").style.display = "none";
+
+    try {
+      const res = await fetch(`/combo?leagues=${encodeURIComponent(leagues)}&next=${next}&max_picks=10&min_odds=${minOdds}`);
+      if (!res.ok) { const e = await res.json(); throw new Error(e.detail || "Erreur serveur"); }
+      const data = await res.json();
+      displayCombo(data);
+    } catch (err) {
+      showError(err.message);
+      document.getElementById("emptyState").style.display = "block";
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // ── HISTORY ──────────────────────────────────────────────
+  let historyVisible = false;
+
+  async function toggleHistory() {
+    const section = document.getElementById("historySection");
+    historyVisible = !historyVisible;
+    section.style.display = historyVisible ? "block" : "none";
+    if (historyVisible) await refreshHistory();
+  }
+
+  async function refreshHistory() {
+    const list = document.getElementById("historyList");
+    list.innerHTML = '<div class="history-empty">Chargement...</div>';
+    try {
+      const res = await fetch("/history");
+      const entries = await res.json();
+      document.getElementById("historyCount").textContent =
+        `${entries.length} entrée${entries.length !== 1 ? 's' : ''}`;
+
+      if (entries.length === 0) {
+        list.innerHTML = '<div class="history-empty">Aucun combiné enregistré.</div>';
+        return;
+      }
+
+      list.innerHTML = entries.map(e => {
+        const date = new Date(e.combo.generated_at).toLocaleString("fr-FR", {
+          day: "2-digit", month: "2-digit", year: "numeric",
+          hour: "2-digit", minute: "2-digit"
+        });
+        const badge = e.combo.target_reached
+          ? '<span style="background:#1a3a1e;color:#3fb950;border-radius:20px;padding:2px 8px;font-size:0.72rem;font-weight:700;">✓</span>'
+          : '<span style="background:#3a2f0a;color:#d29922;border-radius:20px;padding:2px 8px;font-size:0.72rem;font-weight:700;">⚠</span>';
+        return `
+          <div class="history-entry">
+            <div>
+              <div class="entry-date">${date}</div>
+              <div class="entry-meta">${e.combo.picks.length} picks &nbsp;·&nbsp; Cote&nbsp;<span style="color:#f0c040;">${e.combo.total_odds.toFixed(2)}</span> &nbsp;${badge}</div>
+              <div class="entry-leagues">${e.leagues} &nbsp;·&nbsp; cible ${e.min_odds}</div>
+            </div>
+            <div style="color:#3fb950;font-weight:700;font-size:0.9rem;">${e.combo.return_per_100.toFixed(0)} €</div>
+            <button class="btn-sm btn-view" onclick='viewHistoryEntry(${JSON.stringify(e)})'>Voir</button>
+            <button class="btn-sm btn-delete" onclick="deleteHistoryEntry(${e.id})">🗑</button>
+          </div>`;
+      }).join("");
+    } catch (err) {
+      list.innerHTML = `<div class="history-empty">Erreur : ${err.message}</div>`;
+    }
+  }
+
+  function viewHistoryEntry(entry) {
+    const date = new Date(entry.combo.generated_at).toLocaleString("fr-FR", {
+      day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit"
+    });
+    displayCombo(entry.combo, `📋 Historique · ${date}`);
+    document.getElementById("emptyState").style.display = "none";
+  }
+
+  async function deleteHistoryEntry(id) {
+    if (!confirm("Supprimer ce combiné de l'historique ?")) return;
+    await fetch(`/history/${id}`, { method: "DELETE" });
+    await refreshHistory();
+  }
+</script>
+</body>
+</html>
